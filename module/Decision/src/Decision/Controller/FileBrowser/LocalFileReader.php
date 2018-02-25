@@ -22,22 +22,33 @@ class LocalFileReader implements FileReader
      */
     static private $root;
 
-    public function __construct($root)
+    /**
+     * A regex pattern matching all valid filepaths.
+     * @var string
+     */
+    static private $validFilepath;
+
+    public function __construct($root, $validFilepath)
     {
         $this->root = $root;
+        $this->validFilepath = $validFilepath;
     }
 
     public function downloadFile($path)
     {
         $fullPath = $this->root . $path;
-        if (!is_file($fullPath)) {
+        if (!is_file($fullPath) || !$this->isValidPathName($fullPath)) {
             return null;
+        }
+        $contentType = 'octet-stream';
+        if (mime_content_type($fullPath)==='text/plain') {
+            $contentType = 'text/plain';
         }
         $response = new \Zend\Http\Response\Stream();
         $response->setStream(fopen('file://' . $fullPath, 'r'));
         $response->setStatusCode(200);
         $headers = new \Zend\Http\Headers();
-        $headers->addHeaderLine('Content-Type', 'octet-stream')
+        $headers->addHeaderLine('Content-Type', $contentType)
                 ->addHeaderLine('Content-Disposition', 'filename="' . end(explode('/', $fullPath)) . '"')
                 ->addHeaderLine('Content-Length', filesize($fullPath));
         $response->setHeaders($headers);
@@ -56,15 +67,8 @@ class LocalFileReader implements FileReader
         $dircontents = scandir($fullPath);
         $files = [];
         foreach ($dircontents as $dircontent) {
-            if ($dircontent[0]==='.') {
-                continue;
-            }
-            if (is_dir($fullPath . '/' . $dircontent)) {
-                $kind = 'dir';
-            } elseif (is_file($fullPath . '/' . $dircontent)) {
-                $kind = 'file';
-            } else {
-                //Ignore all strange filesystem thingies like symlinks and such
+            $kind = $this->interpretDircontent($dircontent, $fullPath . '/' . $dircontent);
+            if ($kind === false) {
                 continue;
             }
             $files[] = new FileNode(
@@ -76,6 +80,33 @@ class LocalFileReader implements FileReader
         return $files;
     }
 
+    protected function interpretDircontent($dircontent, $fullPath)
+    {
+        if ($dircontent[0] === '.') {
+            return false;
+        }
+        if (!$this->isValidPathName($fullPath)) {
+            return false;
+        }
+        if (is_link($fullPath)) {
+            //symlink could point to illegal location, we must check this
+            if (!$this->isAllowed(substr($fullPath, strlen($this->root)))) {
+                return false;
+            }
+            return $this->interpretDircontent($dircontent, realpath($fullPath));
+        }
+        if (is_dir($fullPath)) {
+            return 'dir';
+        }
+        if (is_file($fullPath)) {
+            return 'file';
+        }
+        //Unknown filesystem entity
+        //(likely, the path doesn't resolve to a valid entry in the filesystem at all)
+        return false;
+    }
+
+
     public function isDir($path)
     {
         return is_dir($this->root . $path);
@@ -84,7 +115,7 @@ class LocalFileReader implements FileReader
     public function isAllowed($path)
     {
         $fullPath = $this->root . $path;
-        if (!is_readable($fullPath)) {
+        if (!is_readable($fullPath) || !$this->isValidPathName($path)) {
             return false;
         }
         $realFullPath = realpath($fullPath);
@@ -94,5 +125,11 @@ class LocalFileReader implements FileReader
             return false;
         }
         return true;
+    }
+
+    protected function isValidPathName($path)
+    {
+        $res = preg_match('#^' . $this->validFilepath . '$#', $path) === 1;
+        return $res;
     }
 }
