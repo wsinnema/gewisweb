@@ -11,7 +11,23 @@ class MemberController extends AbstractActionController
 
     public function indexAction()
     {
-        return new ViewModel(['member' => $this->identity()->getMember()]);
+        $decisionService = $this->getServiceLocator()->get('decision_service_decision');
+
+        // Get the latest 3 meetings of each type and flatten result
+        $meetingsCollection = [
+            'AV' => array_column($decisionService->getPastMeetings(3, 'AV'), 0),
+            'BV' => array_column($decisionService->getPastMeetings(3, 'BV'), 0),
+            'VV' => array_column($decisionService->getPastMeetings(3, 'VV'), 0),
+        ];
+
+        $member = $this->identity()->getMember();
+
+        return new ViewModel([
+            'member'             => $member,
+            'isActive'           => $this->getMemberService()->isActiveMember(),
+            'upcoming'           => $decisionService->getUpcomingMeeting(),
+            'meetingsCollection' => $meetingsCollection,
+        ]);
     }
 
     /**
@@ -62,6 +78,31 @@ class MemberController extends AbstractActionController
     }
 
     /**
+     * Determinues whether a member can be authorized without additional confirmation
+     */
+    public function canAuthorizeAction()
+    {
+        $lidnr = $this->params()->fromQuery('q');
+        $meeting = $this->getDecisionService()->getLatestAV();
+
+        if (!empty($lidnr) && !empty($meeting)) {
+            $member = $this->getMemberService()->findMemberByLidNr($lidnr);
+            $canAuthorize = $this->getMemberService()->canAuthorize($member, $meeting);
+
+            if ($canAuthorize) {
+                return new JsonModel([
+                    'value' => true
+                ]);
+            }
+            return new JsonModel([
+                'value' => false
+            ]);
+        }
+
+        return new ViewModel([]);
+    }
+
+    /**
      * Show birthdays of members.
      */
     public function birthdaysAction()
@@ -103,5 +144,13 @@ class MemberController extends AbstractActionController
     public function getMemberService()
     {
         return $this->getServiceLocator()->get('decision_service_member');
+    }
+
+    /**
+     * Get the decision service.
+     */
+    public function getDecisionService()
+    {
+        return $this->getServiceLocator()->get('decision_service_decision');
     }
 }

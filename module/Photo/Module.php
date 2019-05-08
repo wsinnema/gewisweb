@@ -27,7 +27,7 @@ class Module
         if (APP_ENV === 'production') {
             return [
                 'Zend\Loader\ClassMapAutoloader' => [
-                __DIR__ . '/autoload_classmap.php',
+                    __DIR__ . '/autoload_classmap.php',
                 ]
             ];
         }
@@ -98,6 +98,11 @@ class Module
                         $sm->get('photo_doctrine_em')
                     );
                 },
+                'photo_mapper_profile_photo' => function ($sm) {
+                    return new Mapper\ProfilePhoto(
+                        $sm->get('photo_doctrine_em')
+                    );
+                },
                 'photo_mapper_tag' => function ($sm) {
                     return new Mapper\Tag(
                         $sm->get('photo_doctrine_em')
@@ -145,6 +150,30 @@ class Module
                 // reused code from the eduction module
                 'photo_doctrine_em' => function ($sm) {
                     return $sm->get('doctrine.entitymanager.orm_default');
+                },
+                'album_page_cache' => function() {
+                    return \Zend\Cache\StorageFactory::factory(
+                        array(
+                            'adapter' => array(
+                                'name' => 'filesystem',
+                                'options' => array(
+                                    'dirLevel' => 2,
+                                    'cacheDir' => 'data/cache',
+                                    'dirPermission' => 0755,
+                                    'filePermission' => 0666,
+                                    'namespaceSeparator' => '-db-'
+                                ),
+                            ),
+                            'plugins' => array('serializer'),
+                        )
+                    );
+                },
+                'photo_glide_server' => function($sm) {
+                    $config = $sm->get('config');
+                    return \League\Glide\ServerFactory::create([
+                        'source' => $config['storage']['storage_dir'],
+                        'cache' => $config['storage']['cache_dir'],
+                    ]);
                 }
             ]
         ];

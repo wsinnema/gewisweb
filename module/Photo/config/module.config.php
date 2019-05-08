@@ -145,6 +145,32 @@ return [
                             ],
                         ],
                     ],
+                    'set_profile_photo' => [
+                        'type' => 'Segment',
+                        'options' => [
+                            'route' => '/setprofilephoto/:photo_id',
+                            'constraints' => [
+                                'photo_id' => '[0-9]+',
+                            ],
+                            'defaults' => [
+                                'controller' => 'Photo',
+                                'action' => 'setProfilePhoto',
+                            ],
+                        ],
+                    ],
+                    'remove_profile_photo' => [
+                        'type' => 'Segment',
+                        'options' => [
+                            'route' => '/removeprofilephoto[/:photo_id]',
+                            'constraints' => [
+                                'photo_id' => '[0-9]+',
+                            ],
+                            'defaults' => [
+                                'controller' => 'Photo',
+                                'action' => 'removeProfilePhoto',
+                            ],
+                        ],
+                    ],
                 ],
                 'priority' => 100
             ],
@@ -424,6 +450,15 @@ return [
                         'defaults' => [
                             'controller' => 'Photo\Controller\PhotoAdmin',
                             'action' => 'weeklyPhoto'
+                        ]
+                    ]
+                ],
+                'migrate_aspect_ratio' => [
+                    'options' => [
+                        'route' => 'photo aspectratio',
+                        'defaults' => [
+                            'controller' => 'Photo\Controller\PhotoAdmin',
+                            'action' => 'migrateAspectRatios'
                         ]
                     ]
                 ],
